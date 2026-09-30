@@ -1,0 +1,130 @@
+/* cutout approve page. Light only, by design: there is no dark theme. */
+
+*, *::before, *::after { box-sizing: border-box; }
+[hidden] { display: none !important; }
+
+html { -webkit-text-size-adjust: 100%; }
+body {
+  margin: 0;
+  background: #fff;
+  color: #1a1a1a;
+  font: 17px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+}
+
+main {
+  max-width: 34rem;
+  margin: 0 auto;
+  padding: max(1.25rem, env(safe-area-inset-top)) 1.25rem max(2rem, env(safe-area-inset-bottom));
+}
+
+.brand {
+  margin: 0 0 2rem;
+  font-size: 0.95rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: #6b6b6b;
+}
+
+p { margin: 0 0 1rem; }
+.muted { color: #6b6b6b; }
+
+/* Buttons: large tap targets. */
+button {
+  font: inherit;
+  min-height: 3.25rem;
+  padding: 0.75rem 1.25rem;
+  border-radius: 0.75rem;
+  border: 1px solid transparent;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+button:disabled { opacity: 0.55; cursor: progress; }
+button:focus-visible { outline: 3px solid #1d4ed8; outline-offset: 2px; }
+
+.primary { width: 100%; background: #1d4ed8; color: #fff; font-weight: 600; }
+.primary:hover:not(:disabled) { background: #1e40af; }
+.secondary { width: 100%; background: #fff; color: #1a1a1a; border-color: #c4c4c4; font-weight: 500; }
+.secondary:hover:not(:disabled) { background: #f4f4f5; }
+
+.actions { display: flex; flex-direction: column; gap: 0.75rem; margin: 1.25rem 0 0; }
+@media (min-width: 480px) {
+  .actions { flex-direction: row; }
+  .actions > button { flex: 1; }
+}
+
+/* Result and error lines. */
+.result { font-size: 1.25rem; font-weight: 600; color: #14532d; }
+.error {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem;
+  margin: 1rem 0 0;
+  color: #b3261e;
+  font-weight: 500;
+}
+.retry {
+  min-height: 2.75rem;
+  padding: 0.5rem 1rem;
+  background: #fff;
+  color: #1a1a1a;
+  border-color: #c4c4c4;
+}
+
+/* Device code. */
+.label { margin: 0 0 0.25rem; color: #6b6b6b; font-size: 0.95rem; }
+.code {
+  margin: 0 0 0.5rem;
+  font: 600 2.6rem/1.2 ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  letter-spacing: 0.08em;
+  word-break: break-all;
+}
+
+/* Approval list. */
+.requests { margin-top: 1.5rem; }
+.list { list-style: none; margin: 0; padding: 0; border-top: 1px solid #e4e4e7; }
+.item { border-bottom: 1px solid #e4e4e7; }
+.row {
+  display: block;
+  width: 100%;
+  min-height: 3.5rem;
+  padding: 0.85rem 0.25rem;
+  border: 0;
+  border-radius: 0;
+  background: none;
+  color: inherit;
+  text-align: left;
+}
+.row:hover { background: #fafafa; }
+.row-top { display: flex; align-items: baseline; gap: 0.5rem; }
+.from {
+  flex: 1;
+  min-width: 0;
+  font-weight: 600;
+  font-size: 0.95rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.age { color: #6b6b6b; font-size: 0.9rem; font-variant-numeric: tabular-nums; }
+.first {
+  display: block;
+  margin-top: 0.15rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.row[aria-expanded="true"] .first { display: none; } /* the full body below repeats it */
+.badge { font-size: 0.85rem; font-weight: 600; padding: 0.1rem 0.5rem; border-radius: 999px; background: #f4f4f5; color: #3f3f46; }
+.badge.ok { background: #dcfce7; color: #14532d; }
+.badge.no { background: #fee2e2; color: #7f1d1d; }
+
+.detail { padding: 0 0.25rem 1.25rem; }
+.body {
+  margin: 0 0 0.75rem;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.context { margin-top: 0.75rem; padding-left: 0.75rem; border-left: 3px solid #e4e4e7; }
+.ctx-meta { margin: 0 0 0.15rem; color: #6b6b6b; font-size: 0.85rem; }
+.ctx .body { font-size: 0.95rem; color: #3f3f46; }

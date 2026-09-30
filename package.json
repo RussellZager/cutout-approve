@@ -1,0 +1,11 @@
+{
+  "name": "cutout-approve",
+  "private": true,
+  "description": "Static passkey page for cutout: add a passkey, confirm a CLI login, approve agent requests. Test tooling only; the site itself has no build step.",
+  "scripts": {
+    "test": "playwright test"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.63.0"
+  }
+}
