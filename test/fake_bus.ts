@@ -10,6 +10,8 @@
 // Env: PAGE_PORT (default 8765), BUS_PORT (8766), PAGE_DIR (repo root).
 // Test-control routes live under /__test/* (no CORS; the test runner calls them).
 
+import { pageHandler, servePage } from "./serve_page.ts";
+
 const lib = await import("jsr:@simplewebauthn/server@14.0.3");
 
 const PAGE_PORT = Number(Deno.env.get("PAGE_PORT") ?? 8765);
@@ -18,7 +20,6 @@ const PAGE_DIR = Deno.env.get("PAGE_DIR") ?? new URL("..", import.meta.url).path
 const RP_ID = "localhost";
 const PAGE_ORIGIN = `http://localhost:${PAGE_PORT}`;
 const BUS_ORIGIN = `http://localhost:${BUS_PORT}`;
-const PROD_BUS_ORIGIN = "https://ulnxanoxrkfhohxiwuxn.supabase.co";
 const CHALLENGE_TTL_MS = 300_000;
 const PREFIX = "/functions/v1/cutout";
 
@@ -314,27 +315,7 @@ async function busHandler(req: Request): Promise<Response> {
   }
 }
 
-// ---------------- static page server ----------------
-const TYPES: Record<string, string> = {
-  "/index.html": "text/html; charset=utf-8", "/app.js": "text/javascript; charset=utf-8",
-  "/config.js": "text/javascript; charset=utf-8", "/style.css": "text/css; charset=utf-8",
-};
-async function pageHandler(req: Request): Promise<Response> {
-  const url = new URL(req.url);
-  const p = url.pathname === "/" ? "/index.html" : url.pathname;
-  const type = TYPES[p];
-  if (!type) return new Response("not found", { status: 404 });
-  let text = await Deno.readTextFile(`${PAGE_DIR}${p}`);
-  // The shipped CSP names the production bus. For tests, point connect-src at this
-  // fake bus instead, unless ?csp=raw asks for the file exactly as shipped.
-  if (p === "/index.html" && url.searchParams.get("csp") !== "raw") {
-    text = text.replaceAll(PROD_BUS_ORIGIN, BUS_ORIGIN);
-  }
-  return new Response(text, { headers: { "content-type": type, "cache-control": "no-store" } });
-}
-
 Deno.serve({ port: BUS_PORT, hostname: "127.0.0.1", onListen: () => {} }, busHandler);
 Deno.serve({ port: BUS_PORT, hostname: "::1", onListen: () => {} }, busHandler);
-Deno.serve({ port: PAGE_PORT, hostname: "127.0.0.1", onListen: () => {} }, pageHandler);
-Deno.serve({ port: PAGE_PORT, hostname: "::1", onListen: () => {} }, pageHandler);
+servePage(PAGE_PORT, pageHandler(PAGE_DIR, BUS_ORIGIN));
 console.log(`fake bus ${BUS_ORIGIN}${PREFIX}  page ${PAGE_ORIGIN}  rp ${RP_ID}`);
