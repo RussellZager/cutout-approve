@@ -33,6 +33,16 @@ The browser API it calls is the cutout v1.12 SPEC section "Passkeys and phone ap
 - The page has no secrets. The bus allows CORS only from this page's origin.
 - **The RP ID is permanent.** Passkeys are bound to `approve.russellzager.com`. Moving the page to another host means registering new passkeys.
 
+## Passkey prompts and Safari
+
+Safari can refuse `navigator.credentials.*` when an awaited fetch runs between the tap and the call. So the page fetches each challenge **before** the tap: register and device-code options on load, list options on load (and again after each list), and both decide options when a row is expanded. A tap starts the passkey prompt synchronously. Buttons stay disabled until their options arrive.
+
+- Challenges live 300 s. A prefetched challenge older than 240 s is not used: the page fetches a new one and shows "That took too long. Try again." with Retry. `bad_challenge` from the bus does the same.
+- Every Retry after a failed prompt or a failed check uses a new challenge. The page never retries on its own.
+- `test/gesture_spy.ts` logs clicks, fetches, and passkey calls in the page. Both suites assert that every prompt started inside its tap with no fetch first.
+
+Other screens: the code screen says "Only confirm if you just ran cutout login and this code matches." The root page has a "Have a code?" box (any case, dash optional) for when the CLI cannot open the browser. Text the bus cut at 2000 characters ends with "(shortened)".
+
 ## Changing the bus URL
 
 Edit `DEFAULT_BUS_BASE` in `config.js` **and** the `connect-src` origin in `index.html`. They must match, or the CSP blocks every request (the page then says "Network problem.").
@@ -60,13 +70,13 @@ Needs `deno` and `bun`. Playwright uses its own Chromium (`bunx playwright insta
 ```sh
 bun install
 bunx playwright test            # phone viewport: every test; desktop viewport: screenshot tests
-test/mutation.sh                # breaks escaping, decision binding, frame guard, final-error UI; each named test must go red
+test/mutation.sh                # breaks escaping, bindings, frame guard, final errors, tap-to-prompt, stale/reused challenges, Retry, (shortened), warning, code box; each named test must go red
 SHOTS_DIR=/tmp/shots bunx playwright test   # where screenshots go (default test-results/shots)
 ```
 
 - `test/fake_bus.ts` implements the browser routes of the bus with real WebAuthn verification (`@simplewebauthn/server`), the contract's CORS rules, and single-use bound challenges. It also serves the page on a second port, so page and bus are cross-origin. RP ID is `localhost`.
 - The fake page server rewrites the CSP `connect-src` to the fake bus. `?csp=raw` serves the file as shipped; one test uses it to prove the browser enforces the CSP.
-- `test/e2e.spec.ts` drives the page with Chrome's CDP virtual authenticator (CTAP2, internal, resident key, user verification). It covers register, login Confirm / Not me, list + approve + deny, expired code, cancelled passkey, network failure, an XSS probe, CSP, no dark mode, the localhost-only override, the manual base64url fallback, and frame refusal.
+- `test/e2e.spec.ts` drives the page with Chrome's CDP virtual authenticator (CTAP2, internal, resident key, user verification). It covers register, login Confirm / Not me, list + approve + deny, expired code, cancelled passkey, network failure, an XSS probe, CSP, no dark mode, the localhost-only override, the manual base64url fallback, frame refusal, prompts inside the tap, stale and bad challenges, bad_assertion Retry, register Retry with new options, the "Have a code?" box, and the "(shortened)" marker. `/__test/fail_next` makes the next assertion check fail with a chosen code.
 
 ### Real local bus
 

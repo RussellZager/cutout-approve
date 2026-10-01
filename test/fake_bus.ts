@@ -42,10 +42,11 @@ let devices = new Map<string, Device>();
 let approvals = new Map<string, Approval>();
 let decisions: { request_id: string; decision: string }[] = [];
 let log: Log[] = [];
+let failNext: string | null = null;
 
 function reset() {
   invites = new Map(); challenges = new Map(); passkeys = new Map(); devices = new Map();
-  approvals = new Map(); decisions = []; log = [];
+  approvals = new Map(); decisions = []; log = []; failNext = null;
 }
 
 function rand(n = 32): string {
@@ -109,6 +110,7 @@ function takeChallenge(resp: unknown, purpose: Challenge["purpose"], bound: stri
 async function verifyAssertion(assertion: unknown, purpose: Challenge["purpose"], bound: string) {
   if (!assertion || typeof assertion !== "object") fail(422, "validation_failed", "assertion is required.");
   const ch = takeChallenge(assertion, purpose, bound);
+  if (failNext) { const code = failNext; failNext = null; fail(401, code, `Injected ${code}.`); }
   // deno-lint-ignore no-explicit-any
   const id = String((assertion as any).id ?? "");
   const pk = passkeys.get(id);
@@ -256,6 +258,9 @@ function control(path: string, b: Body): unknown {
       });
       return { request_id: id };
     }
+    case "/__test/fail_next":
+      failNext = String(b.code ?? "bad_assertion");
+      return { ok: true };
     case "/__test/state":
       return {
         passkeys: passkeys.size, decisions,

@@ -116,24 +116,76 @@ async function post(path, body) {
   return data;
 }
 
+const AUTH_OPTIONS = "/v1/passkeys/auth/options";
+
 function needPasskeys() {
   if (!window.PublicKeyCredential || !navigator.credentials) {
     throw new DOMException("no webauthn", "NotSupportedError");
   }
 }
+// Both start the browser's passkey prompt synchronously, before their first await.
 async function createPasskey(optionsJSON) {
   needPasskeys();
   const cred = await navigator.credentials.create({ publicKey: creationOptions(optionsJSON) });
   if (!cred) throw new DOMException("no credential", "NotAllowedError");
   return credentialJSON(cred);
 }
-// One fresh assertion. `bind` is the auth/options body that binds the challenge.
-async function freshAssertion(bind) {
+async function getAssertion(optionsJSON) {
   needPasskeys();
-  const { options } = await post("/v1/passkeys/auth/options", bind);
-  const cred = await navigator.credentials.get({ publicKey: requestOptions(options) });
+  const cred = await navigator.credentials.get({ publicKey: requestOptions(optionsJSON) });
   if (!cred) throw new DOMException("no credential", "NotAllowedError");
   return credentialJSON(cred);
+}
+
+// ------------------------------------------------ prefetched passkey options
+// Safari can refuse navigator.credentials.* when an awaited fetch runs between
+// the tap and the call. So the options (with their server challenge) are fetched
+// BEFORE the tap, and a tap starts the prompt at once.
+// Challenges live 300 s; after FRESH_MS the page gets a new one and asks for one
+// more tap. It never retries on its own.
+const FRESH_MS = 240_000;
+class Ticket {
+  constructor(path, body) {
+    this.path = path;
+    this.body = body;
+    this.state = "idle"; // idle | loading | ready | used | failed
+    this.options = null;
+    this.at = 0;
+    this.error = null;
+    this.seq = 0;
+    this.listeners = [];
+  }
+  on(fn) { this.listeners.push(fn); }
+  emit() { for (const fn of this.listeners) fn(this); }
+  load() {
+    const seq = ++this.seq;
+    this.state = "loading";
+    this.options = null;
+    this.error = null;
+    this.emit();
+    post(this.path, this.body).then((data) => {
+      if (seq !== this.seq) return;
+      this.options = data && data.options;
+      this.at = Date.now();
+      this.state = "ready";
+      this.emit();
+    }, (err) => {
+      if (seq !== this.seq) return;
+      this.error = err;
+      this.state = "failed";
+      this.emit();
+    });
+  }
+  ensure() { if (this.state === "idle") this.load(); }
+  // Synchronous. Fresh options, single use; null when not ready or too old.
+  take() {
+    if (this.state !== "ready" || Date.now() - this.at > FRESH_MS) return null;
+    const options = this.options;
+    this.state = "used";
+    this.options = null;
+    this.emit();
+    return options;
+  }
 }
 
 // ------------------------------------------------------------ plain-word errors
@@ -159,7 +211,7 @@ function explain(err, ctx) {
     case "duplicate_credential": return { text: "This passkey is already added.", retry: false };
     case "name_taken": return { text: "That name is taken. Run cutout passkey add with another name.", retry: false };
     case "bad_registration": return { text: "Passkey not accepted. Try again.", retry: true };
-    case "bad_assertion": return { text: "Passkey not recognized. Run cutout passkey add first.", retry: false };
+    case "bad_assertion": return { text: "Passkey not recognized. Try again, or run cutout passkey add.", retry: true };
     case "not_found":
       if (ctx === "device") return { text: "That code expired. Run cutout login again.", retry: false };
       return { text: "Not available. Try again later.", retry: false };
@@ -171,7 +223,7 @@ function explain(err, ctx) {
   return { text: "Something went wrong. Try again.", retry: true };
 }
 
-// An error line with an optional Retry button. Returns { el, show(err), clear() }.
+// An error line with an optional Retry button. Returns { el, retryEl, show(err, again), clear() }.
 function errorLine(ctx) {
   const text = h("span", { class: "error-text" });
   const retry = h("button", { type: "button", class: "retry", hidden: true }, "Retry");
@@ -180,6 +232,7 @@ function errorLine(ctx) {
   retry.addEventListener("click", () => { if (onRetry) onRetry(); });
   return {
     el,
+    retryEl: retry,
     show(err, again) {
       const { text: msg, retry: canRetry } = explain(err, ctx);
       setText(text, msg);
@@ -188,25 +241,84 @@ function errorLine(ctx) {
       el.hidden = false;
       return canRetry;
     },
-    clear() { el.hidden = true; retry.hidden = true; setText(text, ""); },
+    clear() { el.hidden = true; retry.hidden = true; setText(text, ""); onRetry = null; },
   };
 }
 
-// Run fn with the given buttons disabled; report failure on the error line.
-// A final error (no Retry, e.g. an expired code) also hides the buttons,
-// because pressing them again cannot work.
-async function guarded(buttons, errs, fn, again) {
-  errs.clear();
-  for (const b of buttons) b.disabled = true;
-  app.setAttribute("aria-busy", "true");
-  try {
-    await fn();
-  } catch (err) {
-    if (!errs.show(err, again)) for (const b of buttons) b.hidden = true;
-  } finally {
-    for (const b of buttons) b.disabled = false;
-    app.removeAttribute("aria-busy");
+// Wire buttons to prefetched options: pairs = [[button, ticket], ...].
+// A tap (or a Retry tap) calls prompt(options) with no await before it; then
+// after(button, credentialJSON) finishes the job. Buttons stay disabled until
+// their options are ready. A final error (no Retry, e.g. an expired code) hides
+// the buttons, because pressing them again cannot work.
+function passkeyButtons({ errs, pairs, prompt, after, reloadAfter = false }) {
+  const buttons = pairs.map(([b]) => b);
+  const tickets = [...new Set(pairs.map(([, t]) => t))];
+  let busy = false;
+  let waitFor = null; // the ticket the visible Retry needs
+  let loadError = false; // the visible error came from fetching options
+  const sync = () => {
+    for (const [b, t] of pairs) b.disabled = busy || t.state !== "ready";
+    errs.retryEl.disabled = busy || (waitFor !== null && waitFor.state === "loading");
+  };
+  const stop = () => { for (const b of buttons) b.hidden = true; };
+
+  for (const t of tickets) {
+    t.on(() => {
+      if (t.state === "failed") {
+        loadError = true;
+        waitFor = t;
+        if (!errs.show(t.error, () => t.load())) stop();
+      } else if (t.state === "ready" && loadError && waitFor === t) {
+        loadError = false;
+        waitFor = null;
+        errs.clear();
+      }
+      sync();
+    });
   }
+
+  function tap(b, t) {
+    if (busy) return;
+    const options = t.take();
+    if (!options) {
+      if (t.state === "ready") {
+        // Older than FRESH_MS: get a new challenge and ask for one more tap.
+        t.load();
+        loadError = false;
+        waitFor = t;
+        errs.show(new ApiError(401, "bad_challenge"), () => tap(b, t));
+        sync();
+      }
+      return;
+    }
+    errs.clear();
+    loadError = false;
+    waitFor = null;
+    let cred;
+    try { cred = prompt(options); } catch (e) { cred = Promise.reject(e); }
+    busy = true;
+    app.setAttribute("aria-busy", "true");
+    sync();
+    (async () => {
+      try {
+        await after(b, await cred);
+        if (reloadAfter) t.load();
+      } catch (err) {
+        waitFor = t;
+        const canRetry = errs.show(err, () => tap(b, t));
+        if (canRetry) t.load(); // a new challenge for the Retry tap
+        else stop();
+      } finally {
+        busy = false;
+        app.removeAttribute("aria-busy");
+        sync();
+      }
+    })();
+  }
+
+  for (const [b, t] of pairs) b.addEventListener("click", () => tap(b, t));
+  sync();
+  return { load() { for (const t of tickets) t.ensure(); } };
 }
 
 function done(message) {
@@ -221,20 +333,22 @@ function registerMode(token) {
   }
   const errs = errorLine("register");
   const add = h("button", { type: "button", class: "primary" }, "Add passkey");
-  const run = () => guarded([add], errs, async () => {
-    const { options } = await post("/v1/passkeys/register/options", { token });
-    const credential = await createPasskey(options);
-    await post("/v1/passkeys/register/verify", { token, credential });
-    done("Passkey added. You can close this page.");
-  }, run);
-  add.addEventListener("click", run);
+  const ticket = new Ticket("/v1/passkeys/register/options", { token });
   render(add, errs.el);
+  passkeyButtons({
+    errs, pairs: [[add, ticket]], prompt: createPasskey,
+    after: async (_b, credential) => {
+      await post("/v1/passkeys/register/verify", { token, credential });
+      done("Passkey added. You can close this page.");
+    },
+  }).load();
 }
 
 // ---------------------------------------------------------- mode: device code
 const CODE_ALPHABET = /^[BCDFGHJKLMNPQRSTVWXZ]{8}$/;
+const normCode = (raw) => String(raw).toUpperCase().replace(/[-\s]/g, "");
 function codeMode(raw) {
-  const norm = String(raw).toUpperCase().replace(/[-\s]/g, "");
+  const norm = normCode(raw);
   if (!CODE_ALPHABET.test(norm)) {
     render(h("p", { class: "error", role: "alert" }, "That code looks wrong. Run cutout login again."));
     return;
@@ -243,22 +357,27 @@ function codeMode(raw) {
   const errs = errorLine("device");
   const confirm = h("button", { type: "button", class: "primary" }, "Confirm");
   const notMe = h("button", { type: "button", class: "secondary" }, "Not me");
-  const decide = (route, message) => {
-    const run = () => guarded([confirm, notMe], errs, async () => {
-      const assertion = await freshAssertion({ purpose: "device", user_code: code });
-      await post(route, { user_code: code, assertion });
-      done(message);
-    }, run);
-    return run;
-  };
-  confirm.addEventListener("click", decide("/v1/owner/device/approve", "Signed in on your Mac. You can close this page."));
-  notMe.addEventListener("click", decide("/v1/owner/device/deny", "Sign-in blocked. You can close this page."));
+  const routes = new Map([
+    [confirm, ["/v1/owner/device/approve", "Signed in on your Mac. You can close this page."]],
+    [notMe, ["/v1/owner/device/deny", "Sign-in blocked. You can close this page."]],
+  ]);
+  // One device challenge serves either button (it is bound to the code only).
+  const ticket = new Ticket(AUTH_OPTIONS, { purpose: "device", user_code: code });
   render(
     h("p", { class: "label", id: "code-label" }, "Code on your Mac"),
     h("p", { class: "code", "aria-labelledby": "code-label" }, code),
+    h("p", { class: "warn" }, "Only confirm if you just ran cutout login and this code matches."),
     h("div", { class: "actions" }, confirm, notMe),
     errs.el,
   );
+  passkeyButtons({
+    errs, pairs: [[confirm, ticket], [notMe, ticket]], prompt: getAssertion,
+    after: async (b, assertion) => {
+      const [route, message] = routes.get(b);
+      await post(route, { user_code: code, assertion });
+      done(message);
+    },
+  }).load();
 }
 
 // ------------------------------------------------------------ mode: approvals
@@ -277,6 +396,17 @@ function firstLine(text) {
 }
 const str = (v) => (typeof v === "string" ? v : "");
 
+// The bus cuts each body to BODY_CAP characters (code points) and sends no flag
+// (page_api.md). Honour a flag if one appears; else text at the cap was cut.
+const BODY_CAP = 2000;
+function wasShortened(text, item) {
+  if (item && (item.truncated === true || item.body_truncated === true)) return true;
+  return Array.from(text).length >= BODY_CAP;
+}
+function markShortened(el, text, item) {
+  if (wasShortened(text, item)) el.append(" ", h("span", { class: "shortened" }, "(shortened)"));
+}
+
 let rowSeq = 0;
 function requestItem(a) {
   const id = `req-${++rowSeq}`;
@@ -290,10 +420,12 @@ function requestItem(a) {
 
   const bodyEl = h("p", { class: "body" });
   setText(bodyEl, str(a.body));
+  markShortened(bodyEl, str(a.body), a);
   const context = Array.isArray(a.context) ? a.context : [];
   const ctxEls = context.map((c) => {
     const p = h("p", { class: "body" });
     setText(p, str(c && c.body));
+    markShortened(p, str(c && c.body), c);
     return h("div", { class: "ctx" },
       h("p", { class: "ctx-meta" }, `${str(c && c.from)} · ${age(c && c.created_at)}`), p);
   });
@@ -308,21 +440,22 @@ function requestItem(a) {
     badge.hidden = false;
     badge.className = `badge ${label === "Approved" ? "ok" : label === "Denied" ? "no" : ""}`;
   };
-  const decide = (decision) => {
-    const run = () => guarded([approve, deny], errs, async () => {
+  // Each decision has its own challenge, bound to request_id + decision.
+  const decideTicket = (decision) => new Ticket(AUTH_OPTIONS, { purpose: "decide", request_id: a.request_id, decision });
+  const decisionOf = new Map([[approve, "approve"], [deny, "deny"]]);
+  const wired = passkeyButtons({
+    errs, pairs: [[approve, decideTicket("approve")], [deny, decideTicket("deny")]], prompt: getAssertion,
+    after: async (b, assertion) => {
+      const decision = decisionOf.get(b);
       try {
-        const assertion = await freshAssertion({ purpose: "decide", request_id: a.request_id, decision });
         await post("/v1/approvals/web/decide", { request_id: a.request_id, decision, assertion });
       } catch (err) {
         if (err instanceof ApiError && err.code === "already_decided") { finish("Already decided"); return; }
         throw err;
       }
       finish(decision === "approve" ? "Approved" : "Denied");
-    }, run);
-    return run;
-  };
-  approve.addEventListener("click", decide("approve"));
-  deny.addEventListener("click", decide("deny"));
+    },
+  });
 
   const detail = h("div", { class: "detail", id, hidden: true },
     bodyEl,
@@ -332,26 +465,51 @@ function requestItem(a) {
     const open = detail.hidden;
     detail.hidden = !open;
     row.setAttribute("aria-expanded", String(open));
+    if (open) wired.load(); // fetch both decision challenges before Approve/Deny can be tapped
   });
   return h("li", { class: "item", "data-request-id": str(a.request_id) }, row, detail);
+}
+
+// "Have a code?": the fallback when the CLI cannot open the browser.
+function codeEntry() {
+  const input = h("input", {
+    id: "code-in", type: "text", autocomplete: "off", autocapitalize: "characters",
+    spellcheck: "false", maxlength: "12", placeholder: "XXXX-XXXX",
+  });
+  const open = h("button", { type: "button", class: "secondary open" }, "Open");
+  const bad = h("p", { class: "error", role: "alert", hidden: true }, "That code looks wrong.");
+  const go = () => {
+    const norm = normCode(input.value);
+    if (!CODE_ALPHABET.test(norm)) { bad.hidden = false; return; }
+    location.hash = `code=${norm.slice(0, 4)}-${norm.slice(4)}`;
+  };
+  open.addEventListener("click", go);
+  input.addEventListener("keydown", (e) => { if (e.key === "Enter") go(); });
+  input.addEventListener("input", () => { bad.hidden = true; });
+  return h("div", { class: "have-code" },
+    h("label", { class: "label", for: "code-in" }, "Have a code?"),
+    h("div", { class: "code-entry" }, input, open),
+    bad);
 }
 
 function listMode() {
   const errs = errorLine("list");
   const show = h("button", { type: "button", class: "primary" }, "Show requests");
   const out = h("div", { class: "requests" });
-  const run = () => guarded([show], errs, async () => {
-    const assertion = await freshAssertion({ purpose: "list" });
-    const data = await post("/v1/approvals/web/list", { assertion });
-    const items = Array.isArray(data && data.approvals) ? data.approvals : [];
-    out.replaceChildren(items.length
-      ? h("ul", { class: "list", "aria-label": "Requests" }, items.map(requestItem))
-      : h("p", { class: "muted" }, "No requests."));
-    setText(show, "Refresh");
-    show.className = "secondary";
-  }, run);
-  show.addEventListener("click", run);
-  render(show, errs.el, out);
+  const ticket = new Ticket(AUTH_OPTIONS, { purpose: "list" });
+  render(show, errs.el, out, codeEntry());
+  passkeyButtons({
+    errs, pairs: [[show, ticket]], prompt: getAssertion, reloadAfter: true,
+    after: async (_b, assertion) => {
+      const data = await post("/v1/approvals/web/list", { assertion });
+      const items = Array.isArray(data && data.approvals) ? data.approvals : [];
+      out.replaceChildren(items.length
+        ? h("ul", { class: "list", "aria-label": "Requests" }, items.map(requestItem))
+        : h("p", { class: "muted" }, "No requests."));
+      setText(show, "Refresh");
+      show.className = "secondary";
+    },
+  }).load();
 }
 
 // ------------------------------------------------------------------- routing

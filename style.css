@@ -128,3 +128,27 @@ button:focus-visible { outline: 3px solid #1d4ed8; outline-offset: 2px; }
 .context { margin-top: 0.75rem; padding-left: 0.75rem; border-left: 3px solid #e4e4e7; }
 .ctx-meta { margin: 0 0 0.15rem; color: #6b6b6b; font-size: 0.85rem; }
 .ctx .body { font-size: 0.95rem; color: #3f3f46; }
+
+/* Device-code warning, and the "Have a code?" fallback on the root page. */
+.warn { margin: 0 0 0.5rem; color: #6b6b6b; font-size: 0.95rem; }
+.have-code { margin-top: 2.5rem; padding-top: 1.25rem; border-top: 1px solid #e4e4e7; }
+.code-entry { display: flex; gap: 0.5rem; }
+.code-entry input {
+  flex: 1;
+  min-width: 0;
+  min-height: 3.25rem;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid #c4c4c4;
+  border-radius: 0.75rem;
+  background: #fff;
+  color: #1a1a1a;
+  font: 600 1.15rem ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.code-entry input:focus-visible { outline: 3px solid #1d4ed8; outline-offset: 2px; }
+.code-entry .open { width: auto; }
+.retry:disabled { cursor: progress; }
+
+/* Marker for text the bus cut short. */
+.shortened { color: #6b6b6b; font-style: italic; white-space: nowrap; }

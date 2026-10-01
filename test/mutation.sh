@@ -51,20 +51,24 @@ arm "real: xss body via innerHTML" "real bus" \
   'bodyEl.innerHTML = str(a.body);'
 
 arm "real: decision binding dropped" "real bus" \
-  'freshAssertion({ purpose: "decide", request_id: a.request_id, decision })' \
-  'freshAssertion({ purpose: "decide", request_id: a.request_id })'
+  '{ purpose: "decide", request_id: a.request_id, decision }' \
+  '{ purpose: "decide", request_id: a.request_id }'
 
 arm "real: decision binding wrong (always approve)" "real bus" \
-  'freshAssertion({ purpose: "decide", request_id: a.request_id, decision })' \
-  'freshAssertion({ purpose: "decide", request_id: a.request_id, decision: "approve" })'
+  '{ purpose: "decide", request_id: a.request_id, decision }' \
+  '{ purpose: "decide", request_id: a.request_id, decision: "approve" }'
 
 arm "real: device binding uses wrong code" "real bus" \
-  'freshAssertion({ purpose: "device", user_code: code })' \
-  'freshAssertion({ purpose: "device", user_code: "BBBB-BBBB" })'
+  '{ purpose: "device", user_code: code }' \
+  '{ purpose: "device", user_code: "BBBB-BBBB" }'
 
 arm "real: already_decided not handled" "real bus" \
   'if (err instanceof ApiError && err.code === "already_decided") { finish("Already decided"); return; }' \
   ''
+
+arm "real: fetch between tap and passkey prompt" "real bus" \
+  'try { cred = prompt(options); }' \
+  'try { cred = post(t.path, t.body).then((d) => prompt(d.options)); }'
 
 else
 arm "xss: body via innerHTML" "XSS probe" \
@@ -72,20 +76,48 @@ arm "xss: body via innerHTML" "XSS probe" \
   'bodyEl.innerHTML = str(a.body);'
 
 arm "decision binding dropped from auth/options" "list, expand, approve one and deny one" \
-  'freshAssertion({ purpose: "decide", request_id: a.request_id, decision })' \
-  'freshAssertion({ purpose: "decide", request_id: a.request_id })'
+  '{ purpose: "decide", request_id: a.request_id, decision }' \
+  '{ purpose: "decide", request_id: a.request_id }'
 
 arm "decision binding wrong (always approve)" "list, expand, approve one and deny one" \
-  'freshAssertion({ purpose: "decide", request_id: a.request_id, decision })' \
-  'freshAssertion({ purpose: "decide", request_id: a.request_id, decision: "approve" })'
+  '{ purpose: "decide", request_id: a.request_id, decision }' \
+  '{ purpose: "decide", request_id: a.request_id, decision: "approve" }'
 
 arm "frame guard removed" "refuses to run inside a frame" \
   'if (window.top !== window.self) {' \
   'if (false) {'
 
 arm "final error keeps dead buttons" "expired code says so" \
-  'if (!errs.show(err, again)) for (const b of buttons) b.hidden = true;' \
-  'errs.show(err, again);'
+  'if (!errs.show(t.error, () => t.load())) stop();' \
+  'errs.show(t.error, () => t.load());'
+
+arm "fetch between tap and passkey prompt (WebKit activation)" "starts inside the tap" \
+  'try { cred = prompt(options); }' \
+  'try { cred = post(t.path, t.body).then((d) => prompt(d.options)); }'
+
+arm "stale prefetched challenge used anyway" "stale prefetched challenge" \
+  'Date.now() - this.at > FRESH_MS' \
+  'false'
+
+arm "Retry reuses the old options" "register Retry fetches new options" \
+  'if (canRetry) t.load(); // a new challenge for the Retry tap' \
+  'if (canRetry) { t.options = options; t.state = "ready"; t.at = Date.now(); }'
+
+arm "bad_assertion is final" "bad_assertion offers Retry" \
+  '"Passkey not recognized. Try again, or run cutout passkey add.", retry: true' \
+  '"Passkey not recognized. Try again, or run cutout passkey add.", retry: false'
+
+arm "no (shortened) marker" "marked \\(shortened\\)" \
+  'return Array.from(text).length >= BODY_CAP;' \
+  'return false;'
+
+arm "device-code warning missing" "device code: Confirm signs the Mac in" \
+  'h("p", { class: "warn" }, "Only confirm if you just ran cutout login and this code matches."),' \
+  ''
+
+arm "Have a code? needs exact upper-case input" "Have a code" \
+  'const norm = normCode(input.value);' \
+  'const norm = input.value.replace("-", "");'
 
 fi
 

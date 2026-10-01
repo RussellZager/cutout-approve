@@ -6,6 +6,7 @@ import { expect, test, type CDPSession, type Page } from "@playwright/test";
 import { mkdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { LB_FILE, REAL_PAGE_PORT, ROOT } from "./real_setup";
+import { clearGestures, gestureReport, inTap, installGestureSpy } from "./gesture_spy";
 
 interface LB { base_url: string; operator_id: string; operator_key: string; agent_id: string; agent_key: string; owner_id: string }
 const lb: LB = JSON.parse(readFileSync(LB_FILE, "utf8"));
@@ -76,6 +77,11 @@ async function copyCredentials(from: { cdp: CDPSession; id: string }, to: { cdp:
   return credentials.length;
 }
 const url = (hash = "") => `${PAGE}/?bus=${encodeURIComponent(B)}${hash ? `#${hash}` : ""}`;
+// Every passkey prompt so far started inside its tap with no fetch first; then reset.
+async function expectTapGestures(page: Page, calls: string[]) {
+  expect(await gestureReport(page)).toEqual(calls.map(inTap));
+  await clearGestures(page);
+}
 async function shot(page: Page, name: string) {
   await page.screenshot({ path: join(SHOTS, `real-phone-${name}.png`), fullPage: true });
 }
@@ -84,6 +90,7 @@ test("real bus: register, login confirm, Not me, list, approve, deny, already de
   test.setTimeout(420_000);
   const dialogs: string[] = [];
   page.on("dialog", async (d) => { dialogs.push(d.message()); await d.dismiss(); });
+  await installGestureSpy(page);
   const auth = await authenticator(page);
 
   await test.step("register a passkey from an operator-key invite", async () => {
@@ -96,6 +103,7 @@ test("real bus: register, login confirm, Not me, list, approve, deny, already de
     await page.getByRole("button", { name: "Add passkey" }).click();
     await expect(page.getByText("Passkey added. You can close this page.")).toBeVisible();
     await shot(page, "register-done");
+    await expectTapGestures(page, ["create"]);
   });
 
   await test.step("device login: Confirm, and the CLI poll gets a session once", async () => {
@@ -108,10 +116,13 @@ test("real bus: register, login confirm, Not me, list, approve, deny, already de
     expect([first.status, first.body.code]).toEqual([400, "authorization_pending"]);
     await page.goto(url(`code=${code}`));
     await expect(page.getByText(code, { exact: true })).toBeVisible();
+    await expect(page.getByText("Only confirm if you just ran cutout login and this code matches.", { exact: true })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Confirm" })).toBeEnabled(); // device options prefetched
     await shot(page, "code-idle");
     await page.getByRole("button", { name: "Confirm" }).click();
     await expect(page.getByText("Signed in on your Mac. You can close this page.")).toBeVisible();
     await shot(page, "code-done");
+    await expectTapGestures(page, ["get"]);
     const tok = await pollUntilDone(String(dev.body.device_code), Number(dev.body.interval ?? 5));
     expect(tok.status, JSON.stringify(tok.body)).toBe(200);
     expect(String(tok.body.session_token)).toMatch(/^cos_/);
@@ -129,6 +140,7 @@ test("real bus: register, login confirm, Not me, list, approve, deny, already de
     await page.getByRole("button", { name: "Not me" }).click();
     await expect(page.getByText("Sign-in blocked. You can close this page.")).toBeVisible();
     await shot(page, "code-notme");
+    await expectTapGestures(page, ["get"]);
     const tok = await pollUntilDone(String(dev.body.device_code), Number(dev.body.interval ?? 5));
     expect([tok.status, tok.body.code]).toEqual([400, "access_denied"]);
   });
@@ -153,6 +165,9 @@ test("real bus: register, login confirm, Not me, list, approve, deny, already de
   const row = (p: Page, k: string) => p.locator(`[data-request-id="${asks[k]}"]`);
   await test.step("list shows every request, one line each", async () => {
     await page.goto(url());
+    await expect(page.getByLabel("Have a code?")).toBeVisible();
+    await expect(page.getByRole("button", { name: "Show requests" })).toBeEnabled();
+    await shot(page, "root");
     await page.getByRole("button", { name: "Show requests" }).click();
     for (const k of Object.keys(asks)) await expect(row(page, k)).toContainText(lb.agent_id);
     await expect(row(page, "approve")).toContainText("May I rotate the staging key?");
@@ -214,6 +229,8 @@ test("real bus: register, login confirm, Not me, list, approve, deny, already de
     await expect(row(page, "race").getByText("Already decided", { exact: true })).toBeVisible();
     await expect(row(page, "race").getByRole("button", { name: "Deny", exact: true })).toHaveCount(0);
     await shot(page, "already-decided");
+    // list, approve, deny, and this Deny: four prompts, each inside its tap.
+    await expectTapGestures(page, ["get", "get", "get", "get"]);
     expect(await decisionsSeen(t("race"))).toEqual([
       { from: lb.operator_id, reply_to: asks.race, decision: "approve", verified_sender_role: "operator" },
     ]);
@@ -223,5 +240,6 @@ test("real bus: register, login confirm, Not me, list, approve, deny, already de
     await page.getByRole("button", { name: "Refresh" }).click();
     await expect(row(page, "xss")).toBeVisible();
     for (const k of ["approve", "deny", "race"]) await expect(row(page, k)).toHaveCount(0);
+    await expectTapGestures(page, ["get"]);
   });
 });
