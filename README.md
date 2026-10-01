@@ -76,17 +76,17 @@ SHOTS_DIR=/tmp/shots bunx playwright test   # where screenshots go (default test
 
 - `test/fake_bus.ts` implements the browser routes of the bus with real WebAuthn verification (`@simplewebauthn/server`), the contract's CORS rules, and single-use bound challenges. It also serves the page on a second port, so page and bus are cross-origin. RP ID is `localhost`.
 - The fake page server rewrites the CSP `connect-src` to the fake bus. `?csp=raw` serves the file as shipped; one test uses it to prove the browser enforces the CSP.
-- `test/e2e.spec.ts` drives the page with Chrome's CDP virtual authenticator (CTAP2, internal, resident key, user verification). It covers register, login Confirm / Not me, list + approve + deny, expired code, cancelled passkey, network failure, an XSS probe, CSP, no dark mode, the localhost-only override, the manual base64url fallback, frame refusal, prompts inside the tap, stale and bad challenges, bad_assertion Retry, register Retry with new options, the "Have a code?" box, and the "(shortened)" marker. `/__test/fail_next` makes the next assertion check fail with a chosen code.
+- `test/e2e.pw.ts` drives the page with Chrome's CDP virtual authenticator (CTAP2, internal, resident key, user verification). It covers register, login Confirm / Not me, list + approve + deny, expired code, cancelled passkey, network failure, an XSS probe, CSP, no dark mode, the localhost-only override, the manual base64url fallback, frame refusal, prompts inside the tap, stale and bad challenges, bad_assertion Retry, register Retry with new options, the "Have a code?" box, and the "(shortened)" marker. `/__test/fail_next` makes the next assertion check fail with a chosen code.
 
 ### Real local bus
 
 ```sh
-E2E_TARGET=real bunx playwright test         # project real-phone: test/real.spec.ts only
+E2E_TARGET=real bunx playwright test         # project real-phone: test/real.pw.ts only
 MUT_TARGET=real test/mutation.sh             # real-bus mutation arms; each must go red
 CUTOUT_REPO=/path/to/cutout E2E_TARGET=real bunx playwright test   # default: the usual cutout checkout
 ```
 
 - `test/real_setup.ts` (globalSetup) starts `python3 tests/run_local_bus.py --passkeys-origin http://localhost:18765 --port 18766` in `CUTOUT_REPO`, then serves the page on **exactly `http://localhost:18765`** (the bus CORS and passkey origin are exact-match). Ports 18765 and 18766 must be free. Teardown sends SIGTERM only. Bus stderr goes to `test-results/real-bus.stderr.log`.
-- `test/real.spec.ts` seeds only through the bus API (TypeScript ports of the invite / device / poll / ask / thread recipes), never through test-only routes. It checks that the CLI poll gets the token after Confirm and `access_denied` after Not me, and that the requester's thread shows each approve / deny with `verified_sender_role: operator`, and that a second decision gets "Already decided".
+- `test/real.pw.ts` seeds only through the bus API (TypeScript ports of the invite / device / poll / ask / thread recipes), never through test-only routes. It checks that the CLI poll gets the token after Confirm and `access_denied` after Not me, and that the requester's thread shows each approve / deny with `verified_sender_role: operator`, and that a second decision gets "Already decided".
 - `test/serve_page.ts` is the shared page server (CSP `connect-src` rewrite, `?csp=raw`), used by both targets.
 - GitHub Pages also publishes `test/`, `package.json` and this README. They hold no secrets.

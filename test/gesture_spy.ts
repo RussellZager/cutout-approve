@@ -1,4 +1,4 @@
-// Shared by test/e2e.spec.ts and test/real.spec.ts.
+// Shared by test/e2e.pw.ts and test/real.pw.ts.
 import type { Page } from "@playwright/test";
 
 // Gesture spy. WebKit may refuse navigator.credentials.* when an awaited fetch sits

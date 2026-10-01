@@ -2,7 +2,7 @@
 # Mutation arms: break one safety property in app.js, and prove the named test goes red.
 # app.js is backed up with a checksum and restored by an EXIT trap.
 #   test/mutation.sh                     # fake-bus arms; exit 0 only if every arm went red and app.js is restored
-#   MUT_TARGET=real test/mutation.sh     # the same idea against the real local bus (test/real.spec.ts)
+#   MUT_TARGET=real test/mutation.sh     # the same idea against the real local bus (test/real.pw.ts)
 set -uo pipefail
 cd "$(dirname "$0")/.." || exit 2
 
