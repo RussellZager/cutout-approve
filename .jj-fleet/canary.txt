@@ -1,1 +1,2 @@
 jj-fleet canary; safe to ignore
+A3/A4 probe land 2026-10-01T01:18Z
