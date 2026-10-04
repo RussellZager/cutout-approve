@@ -13,7 +13,7 @@ export const ROOT = join(__dirname, "..");
 export const REAL_PAGE_PORT = 18765; // the bus's PASSKEY_ORIGIN is exactly http://localhost:18765
 export const REAL_BUS_PORT = Number(process.env.REAL_BUS_PORT ?? 18766);
 export const LB_FILE = join(ROOT, "test-results", "real-bus.json");
-const CUTOUT_REPO = process.env.CUTOUT_REPO ?? "/Users/rzager/code/rz@russellzager.com/cutout";
+const CUTOUT_REPO = process.env.CUTOUT_REPO ?? "/Users/rzager/Code/rz@russellzager.com/switchboard/cutout";
 
 function waitForLine(p: ChildProcess, match: (line: string) => boolean, what: string, ms: number): Promise<string> {
   return new Promise((resolve, reject) => {
