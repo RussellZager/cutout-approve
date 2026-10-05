@@ -3,7 +3,7 @@
   "configVersion": 1,
   "workspaces": {
     "": {
-      "name": "cutout-approve",
+      "name": "switchboard-approve",
       "devDependencies": {
         "@playwright/test": "1.63.0",
       },

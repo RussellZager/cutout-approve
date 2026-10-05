@@ -1,7 +1,7 @@
-// Global setup for E2E_TARGET=real: start the real local cutout bus and the page server.
+// Global setup for E2E_TARGET=real: start the real local Switchboard bus and the page server.
 //
 // 1. `python3 tests/run_local_bus.py --passkeys-origin http://localhost:18765 --port <BUS_PORT>`
-//    in the cutout repo (CUTOUT_REPO). It prints one JSON line (base_url, keys, ids).
+//    in the bus repo (SWITCHBOARD_REPO, then CUTOUT_REPO). It prints one JSON line (base_url, keys, ids).
 // 2. test/serve_page.ts on exactly http://localhost:18765, with CSP connect-src = the bus origin.
 // Both stop with SIGTERM in the returned teardown (never SIGKILL: the bus deletes its
 // scratch Postgres cluster on SIGTERM).
@@ -13,7 +13,8 @@ export const ROOT = join(__dirname, "..");
 export const REAL_PAGE_PORT = 18765; // the bus's PASSKEY_ORIGIN is exactly http://localhost:18765
 export const REAL_BUS_PORT = Number(process.env.REAL_BUS_PORT ?? 18766);
 export const LB_FILE = join(ROOT, "test-results", "real-bus.json");
-const CUTOUT_REPO = process.env.CUTOUT_REPO ?? "/Users/rzager/Code/rz@russellzager.com/switchboard/cutout";
+// The bus checkout keeps its old folder name until the folder rename (design §2, U15).
+const BUS_REPO = process.env.SWITCHBOARD_REPO || process.env.CUTOUT_REPO || "/Users/rzager/Code/rz@russellzager.com/switchboard/cutout";
 
 function waitForLine(p: ChildProcess, match: (line: string) => boolean, what: string, ms: number): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -46,7 +47,7 @@ export default async function globalSetup() {
   const busLog = createWriteStream(join(ROOT, "test-results", "real-bus.stderr.log"));
   const bus = spawn("python3", [
     "tests/run_local_bus.py", "--passkeys-origin", `http://localhost:${REAL_PAGE_PORT}`, "--port", String(REAL_BUS_PORT),
-  ], { cwd: CUTOUT_REPO, stdio: ["ignore", "pipe", "pipe"] });
+  ], { cwd: BUS_REPO, stdio: ["ignore", "pipe", "pipe"] });
   bus.stderr!.pipe(busLog);
   let page: ChildProcess | null = null;
   const teardown = async () => {

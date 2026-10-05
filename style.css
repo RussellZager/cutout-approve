@@ -1,4 +1,4 @@
-/* cutout approve page. Light only, by design: there is no dark theme. */
+/* Switchboard approve page. Light only, by design: there is no dark theme. */
 
 *, *::before, *::after { box-sizing: border-box; }
 [hidden] { display: none !important; }

@@ -1,17 +1,17 @@
-# cutout-approve
+# switchboard-approve
 
-The static page at `https://approve.russellzager.com` for [cutout](../cutout) v1.12 passkeys.
+The static page at `https://approve.russellzager.com` for [Switchboard](../cutout) passkeys (the bus repo folder keeps its old name until the folder rename).
 It does three things, chosen by the URL fragment:
 
 | URL | What the owner sees |
 |---|---|
-| `#register=<token>` (from `cutout passkey add`) | **Add passkey** → "Passkey added. You can close this page." |
-| `#code=WDJB-MJHT` (from `cutout login`) | The code, **Confirm** / **Not me** → "Signed in on your Mac." |
+| `#register=<token>` (from `switchboard passkey add`) | **Add passkey** → "Passkey added. You can close this page." |
+| `#code=WDJB-MJHT` (from `switchboard login`) | The code, **Confirm** / **Not me** → "Signed in on your Mac." |
 | no fragment | **Show requests** → one line per pending agent request; tap for full text; **Approve** / **Deny** |
 
 Every action asks for the passkey again (Face ID / Touch ID). Each bus challenge is single use and bound to that one action: the invite, the login code, the list, or one `request_id` + decision. The page stores nothing: no cookies, no localStorage, no session.
 
-The browser API it calls is the cutout v1.12 SPEC section "Passkeys and phone approvals"; the bus is the WebAuthn verifier.
+The browser API it calls is the Switchboard SPEC (v1.12+) section "Passkeys and phone approvals"; the bus is the WebAuthn verifier.
 
 ## Files
 
@@ -41,7 +41,7 @@ Safari can refuse `navigator.credentials.*` when an awaited fetch runs between t
 - Every Retry after a failed prompt or a failed check uses a new challenge. The page never retries on its own.
 - `test/gesture_spy.ts` logs clicks, fetches, and passkey calls in the page. Both suites assert that every prompt started inside its tap with no fetch first.
 
-Other screens: the code screen says "Only confirm if you just ran cutout login and this code matches." The root page has a "Have a code?" box (any case, dash optional) for when the CLI cannot open the browser. Text the bus cut at 2000 characters ends with "(shortened)".
+Other screens: the code screen says "Only confirm if you just ran switchboard login and this code matches." The root page has a "Have a code?" box (any case, dash optional) for when the CLI cannot open the browser. Text the bus cut at 2000 characters ends with "(shortened)".
 
 ## Changing the bus URL
 
@@ -49,7 +49,7 @@ Edit `DEFAULT_BUS_BASE` in `config.js` **and** the `connect-src` origin in `inde
 
 ## Deploy (GitHub Pages, custom domain)
 
-Nothing is deployed yet. When approved:
+Live at `https://approve.russellzager.com`. The GitHub repo keeps the name `cutout-approve` until the repo rename (design §2); first-time setup was:
 
 ```sh
 gh repo create RussellZager/cutout-approve --public --source . --push
@@ -72,6 +72,7 @@ bun install
 bunx playwright test            # phone viewport: every test; desktop viewport: screenshot tests
 test/mutation.sh                # breaks escaping, bindings, frame guard, final errors, tap-to-prompt, stale/reused challenges, Retry, (shortened), warning, code box; each named test must go red
 SHOTS_DIR=/tmp/shots bunx playwright test   # where screenshots go (default test-results/shots)
+PAGE_PORT=18865 BUS_PORT=18866 bunx playwright test   # fake target on other ports (gnubby-ssh can hold 18765)
 ```
 
 - `test/fake_bus.ts` implements the browser routes of the bus with real WebAuthn verification (`@simplewebauthn/server`), the contract's CORS rules, and single-use bound challenges. It also serves the page on a second port, so page and bus are cross-origin. RP ID is `localhost`.
@@ -83,10 +84,10 @@ SHOTS_DIR=/tmp/shots bunx playwright test   # where screenshots go (default test
 ```sh
 E2E_TARGET=real bunx playwright test         # project real-phone: test/real.pw.ts only
 MUT_TARGET=real test/mutation.sh             # real-bus mutation arms; each must go red
-CUTOUT_REPO=/path/to/cutout E2E_TARGET=real bunx playwright test   # default: the usual cutout checkout
+SWITCHBOARD_REPO=/path/to/bus E2E_TARGET=real bunx playwright test   # default: the usual bus checkout (CUTOUT_REPO still read)
 ```
 
-- `test/real_setup.ts` (globalSetup) starts `python3 tests/run_local_bus.py --passkeys-origin http://localhost:18765 --port 18766` in `CUTOUT_REPO`, then serves the page on **exactly `http://localhost:18765`** (the bus CORS and passkey origin are exact-match). Ports 18765 and 18766 must be free. Teardown sends SIGTERM only. Bus stderr goes to `test-results/real-bus.stderr.log`.
+- `test/real_setup.ts` (globalSetup) starts `python3 tests/run_local_bus.py --passkeys-origin http://localhost:18765 --port 18766` in `SWITCHBOARD_REPO`, then serves the page on **exactly `http://localhost:18765`** (the bus CORS and passkey origin are exact-match). Ports 18765 and 18766 must be free. Teardown sends SIGTERM only. Bus stderr goes to `test-results/real-bus.stderr.log`.
 - `test/real.pw.ts` seeds only through the bus API (TypeScript ports of the invite / device / poll / ask / thread recipes), never through test-only routes. It checks that the CLI poll gets the token after Confirm and `access_denied` after Not me, and that the requester's thread shows each approve / deny with `verified_sender_role: operator`, and that a second decision gets "Already decided".
 - `test/serve_page.ts` is the shared page server (CSP `connect-src` rewrite, `?csp=raw`), used by both targets.
 - GitHub Pages also publishes `test/`, `package.json` and this README. They hold no secrets.

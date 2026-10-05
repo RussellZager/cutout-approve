@@ -2,7 +2,7 @@ import { defineConfig, type PlaywrightTestConfig } from "@playwright/test";
 
 // Two targets:
 //   default          test/fake_bus.ts (real WebAuthn verification, in-memory state)
-//   E2E_TARGET=real  the real local cutout bus (tests/run_local_bus.py in the cutout repo),
+//   E2E_TARGET=real  the real local Switchboard bus (tests/run_local_bus.py in the bus repo),
 //                    started by test/real_setup.ts; runs test/real.pw.ts only.
 
 // Ports for the fake bus (test/fake_bus.ts) and the page it serves.

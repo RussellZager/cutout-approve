@@ -7,7 +7,7 @@ import { BUS_PORT, PAGE_PORT } from "../playwright.config";
 import { clearGestures, gestureReport, inTap, installGestureSpy } from "./gesture_spy";
 
 const PAGE = `http://localhost:${PAGE_PORT}`;
-const BUS = `http://localhost:${BUS_PORT}/functions/v1/cutout`;
+const BUS = `http://localhost:${BUS_PORT}/functions/v1/switchboard`;
 const CTL = `http://127.0.0.1:${BUS_PORT}`;
 const ROOT = join(__dirname, "..");
 const SHOTS = process.env.SHOTS_DIR ?? join(ROOT, "test-results", "shots");
@@ -74,7 +74,7 @@ test("used invite says the link expired", async ({ page }) => {
   await expect(page.getByText("Passkey added. You can close this page.")).toBeVisible();
   await page.goto(url(`register=${token}`, "&again=1"));
   // Options are fetched on load, so the dead link is reported before any tap.
-  await expect(page.getByText("That link expired. Run cutout passkey add again.")).toBeVisible();
+  await expect(page.getByText("That link expired. Run switchboard passkey add again.")).toBeVisible();
   await expect(page.getByRole("button", { name: "Retry" })).toBeHidden();
   await expect(page.getByRole("button", { name: "Add passkey" })).toBeHidden();
 });
@@ -85,7 +85,7 @@ test("device code: Confirm signs the Mac in @shots", async ({ page }) => {
   const { user_code } = await ctl<{ user_code: string }>("device");
   await page.goto(url(`code=${user_code}`));
   await expect(page.getByText(user_code, { exact: true })).toBeVisible();
-  await expect(page.getByText("Only confirm if you just ran cutout login and this code matches.", { exact: true })).toBeVisible();
+  await expect(page.getByText("Only confirm if you just ran switchboard login and this code matches.", { exact: true })).toBeVisible();
   await shot(page, "code-idle");
   await page.getByRole("button", { name: "Confirm" }).click();
   await expect(page.getByText("Signed in on your Mac. You can close this page.")).toBeVisible();
@@ -114,7 +114,7 @@ test("expired code says so, without Retry @shots", async ({ page }) => {
   await ctl("expire_device", { user_code });
   await page.goto(url(`code=${user_code}`));
   // The device options are fetched on load, so the expiry shows before any tap.
-  await expect(page.getByText("That code expired. Run cutout login again.")).toBeVisible();
+  await expect(page.getByText("That code expired. Run switchboard login again.")).toBeVisible();
   await expect(page.getByRole("button", { name: "Retry" })).toBeHidden();
   // Final error: the buttons go away, since pressing them again cannot work.
   await expect(page.getByRole("button", { name: "Confirm" })).toBeHidden();
@@ -124,7 +124,7 @@ test("expired code says so, without Retry @shots", async ({ page }) => {
 
 test("malformed code is refused before any passkey prompt", async ({ page }) => {
   await page.goto(url("code=<b>x</b>"));
-  await expect(page.getByText("That code looks wrong. Run cutout login again.")).toBeVisible();
+  await expect(page.getByText("That code looks wrong. Run switchboard login again.")).toBeVisible();
   await expect(page.getByRole("button", { name: "Confirm" })).toHaveCount(0);
   expect(await page.locator("main b").count()).toBe(0);
 });
@@ -135,9 +135,9 @@ test("list, expand, approve one and deny one @shots", async ({ page }) => {
   const five = new Date(Date.now() - 5 * 60_000).toISOString();
   const two = new Date(Date.now() - 2 * 3600_000).toISOString();
   const a = await ctl<{ request_id: string }>("approval", {
-    from: "mac.cutout.s1", created_at: two,
-    body: "Deploy cutout 1.12 to prod?\nIt passes the conformance suite.\nSee https://example.com/run/42",
-    context: [{ id: "msg_c1", from: "mac.cutout.s1", type: "note", created_at: two, body: "Running conformance now." }],
+    from: "mac.switchboard.s1", created_at: two,
+    body: "Deploy switchboard 1.13 to prod?\nIt passes the conformance suite.\nSee https://example.com/run/42",
+    context: [{ id: "msg_c1", from: "mac.switchboard.s1", type: "note", created_at: two, body: "Running conformance now." }],
   });
   const b = await ctl<{ request_id: string }>("approval", { from: "ci.bot", created_at: five, body: "Delete the old staging bucket?" });
 
@@ -146,8 +146,8 @@ test("list, expand, approve one and deny one @shots", async ({ page }) => {
   await page.getByRole("button", { name: "Show requests" }).click();
   const rowA = page.locator(`[data-request-id="${a.request_id}"]`);
   const rowB = page.locator(`[data-request-id="${b.request_id}"]`);
-  await expect(rowA).toContainText("mac.cutout.s1");
-  await expect(rowA).toContainText("Deploy cutout 1.12 to prod?");
+  await expect(rowA).toContainText("mac.switchboard.s1");
+  await expect(rowA).toContainText("Deploy switchboard 1.13 to prod?");
   await expect(rowA).toContainText("2h");
   await expect(rowB).toContainText("ci.bot");
   await expect(rowB).toContainText("5m");
@@ -155,7 +155,7 @@ test("list, expand, approve one and deny one @shots", async ({ page }) => {
   await expect(rowA.getByText("It passes the conformance suite.")).toBeHidden();
   await shot(page, "list-collapsed");
 
-  await rowA.getByRole("button", { name: /mac\.cutout\.s1/ }).click();
+  await rowA.getByRole("button", { name: /mac\.switchboard\.s1/ }).click();
   await expect(rowA.getByText("It passes the conformance suite.", { exact: false })).toBeVisible();
   await expect(rowA).toContainText("Running conformance now.");
   await expect(rowA.locator(".first")).toBeHidden(); // summary line not repeated when open
@@ -201,7 +201,7 @@ test("empty list says No requests @shots", async ({ page }) => {
 test("cancelled passkey says so, and Retry recovers @shots", async ({ page }) => {
   const auth = await authenticator(page);
   await registerViaPage(page);
-  await ctl("approval", { from: "mac.cutout.s1", body: "Merge the branch?" });
+  await ctl("approval", { from: "mac.switchboard.s1", body: "Merge the branch?" });
   await auth.cdp.send("WebAuthn.setUserVerified", { authenticatorId: auth.id, isUserVerified: false });
   await page.goto(url());
   await page.getByRole("button", { name: "Show requests" }).click();
@@ -302,11 +302,18 @@ test("bus override is honoured on localhost only", async ({ page }) => {
   expect(local).toBe(BUS);
   await page.goto(`http://approve.test:${PAGE_PORT}/?bus=${encodeURIComponent("https://evil.example/x")}`);
   const remote = await page.evaluate(async () => (await import("/config.js")).BUS_BASE);
-  expect(remote).toBe("https://ulnxanoxrkfhohxiwuxn.supabase.co/functions/v1/cutout");
+  expect(remote).toBe("https://ulnxanoxrkfhohxiwuxn.supabase.co/functions/v1/switchboard");
   // A non-http(s) override is ignored even on localhost.
   await page.goto(`${PAGE}/?bus=${encodeURIComponent("javascript:alert(1)")}`);
   const bad = await page.evaluate(async () => (await import("/config.js")).BUS_BASE);
-  expect(bad).toBe("https://ulnxanoxrkfhohxiwuxn.supabase.co/functions/v1/cutout");
+  expect(bad).toBe("https://ulnxanoxrkfhohxiwuxn.supabase.co/functions/v1/switchboard");
+});
+
+test("brand and title say Switchboard", async ({ page }) => {
+  await page.goto(url());
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText("Switchboard");
+  await expect(page).toHaveTitle("Switchboard");
+  await expect(page.locator("body")).not.toContainText(/cutout/i);
 });
 
 test("works without the JSON helper APIs (manual base64url fallback)", async ({ page }) => {
@@ -411,7 +418,7 @@ test("bad_assertion offers Retry, and Retry recovers", async ({ page }) => {
   await page.goto(url());
   await ctl("fail_next", { code: "bad_assertion" });
   await page.getByRole("button", { name: "Show requests" }).click();
-  await expect(page.getByText("Passkey not recognized. Try again, or run cutout passkey add.")).toBeVisible();
+  await expect(page.getByText("Passkey not recognized. Try again, or run switchboard passkey add.")).toBeVisible();
   const retry = page.getByRole("button", { name: "Retry" });
   await expect(retry).toBeVisible();
   await retry.click();
@@ -447,7 +454,7 @@ test("root page: Have a code? opens the code screen @shots", async ({ page }) =>
   await input.fill(user_code.replace("-", "").toLowerCase()); // any case, no dash
   await input.press("Enter");
   await expect(page.getByText(user_code, { exact: true })).toBeVisible();
-  await expect(page.getByText("Only confirm if you just ran cutout login and this code matches.", { exact: true })).toBeVisible();
+  await expect(page.getByText("Only confirm if you just ran switchboard login and this code matches.", { exact: true })).toBeVisible();
   await page.getByRole("button", { name: "Confirm" }).click();
   await expect(page.getByText("Signed in on your Mac. You can close this page.")).toBeVisible();
   expect((await ctl<State>("state")).devices[user_code.replace("-", "")]).toBe("approved");

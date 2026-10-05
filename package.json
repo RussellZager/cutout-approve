@@ -1,7 +1,7 @@
 {
-  "name": "cutout-approve",
+  "name": "switchboard-approve",
   "private": true,
-  "description": "Static passkey page for cutout: add a passkey, confirm a CLI login, approve agent requests. Test tooling only; the site itself has no build step.",
+  "description": "Static passkey page for Switchboard: add a passkey, confirm a CLI login, approve agent requests. Test tooling only; the site itself has no build step.",
   "scripts": {
     "test": "playwright test"
   },

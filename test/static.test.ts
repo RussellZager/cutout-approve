@@ -36,7 +36,18 @@ describe("published page", () => {
 
   test("bus override is limited to localhost", () => {
     const cfg = read("config.js");
-    expect(cfg).toContain("https://ulnxanoxrkfhohxiwuxn.supabase.co/functions/v1/cutout");
+    expect(cfg).toContain("https://ulnxanoxrkfhohxiwuxn.supabase.co/functions/v1/switchboard");
     expect(cfg).toMatch(/localhost/);
+  });
+
+  test("rename v1.13: the page calls /functions/v1/switchboard and shows Switchboard", () => {
+    const base = read("config.js").match(/DEFAULT_BUS_BASE\s*=\s*"([^"]+)"/)?.[1] ?? "";
+    expect(base).toBe("https://ulnxanoxrkfhohxiwuxn.supabase.co/functions/v1/switchboard");
+    expect(read("index.html").match(/<title>([^<]*)<\/title>/)?.[1]).toBe("Switchboard");
+    expect(read("app.js")).toContain('h("h1", { class: "brand" }, "Switchboard")');
+    // Every visible string and CLI hint uses the new name (rpId and CNAME are not text).
+    for (const f of ["index.html", "app.js", "config.js"]) {
+      expect(read(f).match(/cutout/gi) ?? [], f).toEqual([]);
+    }
   });
 });

@@ -104,15 +104,15 @@ arm "Retry reuses the old options" "register Retry fetches new options" \
   'if (canRetry) { t.options = options; t.state = "ready"; t.at = Date.now(); }'
 
 arm "bad_assertion is final" "bad_assertion offers Retry" \
-  '"Passkey not recognized. Try again, or run cutout passkey add.", retry: true' \
-  '"Passkey not recognized. Try again, or run cutout passkey add.", retry: false'
+  '"Passkey not recognized. Try again, or run switchboard passkey add.", retry: true' \
+  '"Passkey not recognized. Try again, or run switchboard passkey add.", retry: false'
 
 arm "no (shortened) marker" "marked \\(shortened\\)" \
   'return Array.from(text).length >= BODY_CAP;' \
   'return false;'
 
 arm "device-code warning missing" "device code: Confirm signs the Mac in" \
-  'h("p", { class: "warn" }, "Only confirm if you just ran cutout login and this code matches."),' \
+  'h("p", { class: "warn" }, "Only confirm if you just ran switchboard login and this code matches."),' \
   ''
 
 arm "Have a code? needs exact upper-case input" "Have a code" \

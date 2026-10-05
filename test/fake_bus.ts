@@ -1,6 +1,6 @@
-// Fake cutout bus for the approve page's end-to-end tests.
+// Fake Switchboard bus for the approve page's end-to-end tests.
 //
-// Implements the browser routes of cutout v1.12 page_api.md with REAL WebAuthn
+// Implements the browser routes of the bus's page_api.md (v1.12 routes) with REAL WebAuthn
 // verification (@simplewebauthn/server), in-memory state, and the contract's CORS
 // rules for the page origin. It also serves the page itself on a second port, so
 // page and bus are cross-origin exactly as in production.
@@ -21,7 +21,7 @@ const RP_ID = "localhost";
 const PAGE_ORIGIN = `http://localhost:${PAGE_PORT}`;
 const BUS_ORIGIN = `http://localhost:${BUS_PORT}`;
 const CHALLENGE_TTL_MS = 300_000;
-const PREFIX = "/functions/v1/cutout";
+const PREFIX = "/functions/v1/switchboard";
 
 // ---------------- state ----------------
 interface Invite { name: string; expires: number; used: boolean }
@@ -146,7 +146,7 @@ async function route(path: string, b: Body): Promise<[number, unknown]> {
       const inv = invites.get(b.token);
       if (!inv || inv.used || inv.expires < Date.now()) fail(401, "bad_invite", "Invite unknown, used, or expired.");
       const options = await lib.generateRegistrationOptions({
-        rpName: "cutout", rpID: RP_ID, userName: "rz", userDisplayName: "rz (cutout)",
+        rpName: "Switchboard", rpID: RP_ID, userName: "rz", userDisplayName: "rz (switchboard)",
         userID: new TextEncoder().encode("owner-rz"), attestationType: "none", timeout: CHALLENGE_TTL_MS,
         authenticatorSelection: { residentKey: "required", userVerification: "required" },
         supportedAlgorithmIDs: [-8, -7],
@@ -253,7 +253,7 @@ function control(path: string, b: Body): unknown {
     case "/__test/approval": {
       const id = b.request_id ?? `msg_${rand(8)}`;
       approvals.set(id, {
-        request_id: id, thread_id: `thr_${rand(6)}`, from: b.from ?? "mac.cutout.s1",
+        request_id: id, thread_id: `thr_${rand(6)}`, from: b.from ?? "mac.switchboard.s1",
         created_at: b.created_at ?? new Date().toISOString(), body: b.body ?? "", context: b.context ?? [],
       });
       return { request_id: id };

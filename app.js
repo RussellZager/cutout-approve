@@ -1,4 +1,4 @@
-// cutout approve page: add a passkey, confirm a CLI login code, approve or deny
+// Switchboard approve page: add a passkey, confirm a CLI login code, approve or deny
 // agent requests. Plain ES module, no framework, no third-party code.
 //
 // Safety rules:
@@ -29,7 +29,7 @@ function h(tag, attrs = {}, ...children) {
   return el;
 }
 function setText(el, text) { el.textContent = text; }
-function render(...nodes) { app.replaceChildren(h("h1", { class: "brand" }, "cutout"), ...nodes); }
+function render(...nodes) { app.replaceChildren(h("h1", { class: "brand" }, "Switchboard"), ...nodes); }
 
 // ------------------------------------------------------------- base64url codec
 function b64uToBuf(s) {
@@ -207,16 +207,16 @@ function explain(err, ctx) {
     case "rate_limited": return { text: "Too many tries. Wait a minute, then try again.", retry: true };
     case "unavailable": return { text: "Server busy. Try again.", retry: true };
     case "bad_challenge": return { text: "That took too long. Try again.", retry: true };
-    case "bad_invite": return { text: "That link expired. Run cutout passkey add again.", retry: false };
+    case "bad_invite": return { text: "That link expired. Run switchboard passkey add again.", retry: false };
     case "duplicate_credential": return { text: "This passkey is already added.", retry: false };
-    case "name_taken": return { text: "That name is taken. Run cutout passkey add with another name.", retry: false };
+    case "name_taken": return { text: "That name is taken. Run switchboard passkey add with another name.", retry: false };
     case "bad_registration": return { text: "Passkey not accepted. Try again.", retry: true };
-    case "bad_assertion": return { text: "Passkey not recognized. Try again, or run cutout passkey add.", retry: true };
+    case "bad_assertion": return { text: "Passkey not recognized. Try again, or run switchboard passkey add.", retry: true };
     case "not_found":
-      if (ctx === "device") return { text: "That code expired. Run cutout login again.", retry: false };
+      if (ctx === "device") return { text: "That code expired. Run switchboard login again.", retry: false };
       return { text: "Not available. Try again later.", retry: false };
     case "already_decided":
-      if (ctx === "device") return { text: "That code was already used. Run cutout login again.", retry: false };
+      if (ctx === "device") return { text: "That code was already used. Run switchboard login again.", retry: false };
       return { text: "Already decided.", retry: false };
     case "not_an_approval_request": return { text: "That request is gone.", retry: false };
   }
@@ -328,7 +328,7 @@ function done(message) {
 // ------------------------------------------------------------ mode: register
 function registerMode(token) {
   if (!/^[A-Za-z0-9_-]{16,128}$/.test(token)) {
-    render(h("p", { class: "error", role: "alert" }, "That link looks wrong. Run cutout passkey add again."));
+    render(h("p", { class: "error", role: "alert" }, "That link looks wrong. Run switchboard passkey add again."));
     return;
   }
   const errs = errorLine("register");
@@ -350,7 +350,7 @@ const normCode = (raw) => String(raw).toUpperCase().replace(/[-\s]/g, "");
 function codeMode(raw) {
   const norm = normCode(raw);
   if (!CODE_ALPHABET.test(norm)) {
-    render(h("p", { class: "error", role: "alert" }, "That code looks wrong. Run cutout login again."));
+    render(h("p", { class: "error", role: "alert" }, "That code looks wrong. Run switchboard login again."));
     return;
   }
   const code = `${norm.slice(0, 4)}-${norm.slice(4)}`;
@@ -366,7 +366,7 @@ function codeMode(raw) {
   render(
     h("p", { class: "label", id: "code-label" }, "Code on your Mac"),
     h("p", { class: "code", "aria-labelledby": "code-label" }, code),
-    h("p", { class: "warn" }, "Only confirm if you just ran cutout login and this code matches."),
+    h("p", { class: "warn" }, "Only confirm if you just ran switchboard login and this code matches."),
     h("div", { class: "actions" }, confirm, notMe),
     errs.el,
   );

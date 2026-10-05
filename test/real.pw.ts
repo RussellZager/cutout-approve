@@ -1,4 +1,4 @@
-// E2E_TARGET=real: the page against the real local cutout bus (tests/run_local_bus.py).
+// E2E_TARGET=real: the page against the real local Switchboard bus (tests/run_local_bus.py).
 // Seeding and read-back use the bus's own API, as in scratch/v112/recipes.sh:
 // invite (operator key), device start + token poll (the CLI side), agent question,
 // agent thread read (what the requester sees). No test-only routes.
@@ -36,7 +36,7 @@ const recipe = {
   thread: (thread_id: string) => call("GET", `/v1/messages?thread_id=${encodeURIComponent(thread_id)}`, undefined, agent),
 };
 
-// The CLI side of `cutout login`: poll the token endpoint, honouring interval and slow_down.
+// The CLI side of `switchboard login`: poll the token endpoint, honouring interval and slow_down.
 async function pollUntilDone(device_code: string, interval: number, deadlineMs = 90_000): Promise<Res> {
   const end = Date.now() + deadlineMs;
   let wait = interval;
@@ -116,7 +116,7 @@ test("real bus: register, login confirm, Not me, list, approve, deny, already de
     expect([first.status, first.body.code]).toEqual([400, "authorization_pending"]);
     await page.goto(url(`code=${code}`));
     await expect(page.getByText(code, { exact: true })).toBeVisible();
-    await expect(page.getByText("Only confirm if you just ran cutout login and this code matches.", { exact: true })).toBeVisible();
+    await expect(page.getByText("Only confirm if you just ran switchboard login and this code matches.", { exact: true })).toBeVisible();
     await expect(page.getByRole("button", { name: "Confirm" })).toBeEnabled(); // device options prefetched
     await shot(page, "code-idle");
     await page.getByRole("button", { name: "Confirm" }).click();

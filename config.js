@@ -1,10 +1,10 @@
-// Where the page finds the cutout bus. The page holds no secrets.
+// Where the page finds the Switchboard bus. The page holds no secrets.
 //
 // Production: the hosted bus below. It must match connect-src in index.html's CSP.
 // Tests: `?bus=<http(s) URL>` overrides it, but ONLY when the page itself is served
 // from localhost or 127.0.0.1. On any other host the parameter is ignored.
 
-export const DEFAULT_BUS_BASE = "https://ulnxanoxrkfhohxiwuxn.supabase.co/functions/v1/cutout";
+export const DEFAULT_BUS_BASE = "https://ulnxanoxrkfhohxiwuxn.supabase.co/functions/v1/switchboard";
 
 function resolveBusBase(loc) {
   const local = loc.hostname === "localhost" || loc.hostname === "127.0.0.1";
