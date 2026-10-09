@@ -10,7 +10,7 @@
 //       PAGE_PORT=18765 CONNECT_ORIGIN=http://127.0.0.1:18766 \
 //         deno run --allow-net --allow-read --allow-env test/serve_page.ts
 
-export const PROD_BUS_ORIGIN = "https://ulnxanoxrkfhohxiwuxn.supabase.co";
+export const PROD_BUS_ORIGIN = "https://switchboard.russellzager.com";
 
 const TYPES: Record<string, string> = {
   "/index.html": "text/html; charset=utf-8",

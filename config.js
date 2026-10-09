@@ -4,7 +4,7 @@
 // Tests: `?bus=<http(s) URL>` overrides it, but ONLY when the page itself is served
 // from localhost or 127.0.0.1. On any other host the parameter is ignored.
 
-export const DEFAULT_BUS_BASE = "https://ulnxanoxrkfhohxiwuxn.supabase.co/functions/v1/switchboard";
+export const DEFAULT_BUS_BASE = "https://switchboard.russellzager.com/functions/v1/switchboard";
 
 function resolveBusBase(loc) {
   const local = loc.hostname === "localhost" || loc.hostname === "127.0.0.1";

@@ -261,7 +261,7 @@ test("CSP: shipped file carries the strict policy, and the browser enforces it",
   expect(m, "CSP meta tag").not.toBeNull();
   const csp = m![1];
   for (const d of [
-    "default-src 'self'", "connect-src https://ulnxanoxrkfhohxiwuxn.supabase.co", "img-src 'self' data:",
+    "default-src 'self'", "connect-src https://switchboard.russellzager.com", "img-src 'self' data:",
     "style-src 'self'", "script-src 'self'", "base-uri 'none'", "form-action 'none'",
   ]) expect(csp).toContain(d);
   expect(csp).not.toContain("unsafe-inline");
@@ -302,11 +302,11 @@ test("bus override is honoured on localhost only", async ({ page }) => {
   expect(local).toBe(BUS);
   await page.goto(`http://approve.test:${PAGE_PORT}/?bus=${encodeURIComponent("https://evil.example/x")}`);
   const remote = await page.evaluate(async () => (await import("/config.js")).BUS_BASE);
-  expect(remote).toBe("https://ulnxanoxrkfhohxiwuxn.supabase.co/functions/v1/switchboard");
+  expect(remote).toBe("https://switchboard.russellzager.com/functions/v1/switchboard");
   // A non-http(s) override is ignored even on localhost.
   await page.goto(`${PAGE}/?bus=${encodeURIComponent("javascript:alert(1)")}`);
   const bad = await page.evaluate(async () => (await import("/config.js")).BUS_BASE);
-  expect(bad).toBe("https://ulnxanoxrkfhohxiwuxn.supabase.co/functions/v1/switchboard");
+  expect(bad).toBe("https://switchboard.russellzager.com/functions/v1/switchboard");
 });
 
 test("brand and title say Switchboard", async ({ page }) => {

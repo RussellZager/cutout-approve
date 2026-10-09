@@ -17,7 +17,7 @@ describe("published page", () => {
     const csp = html.match(/http-equiv="Content-Security-Policy"\s+content="([^"]+)"/)?.[1] ?? "";
     expect(csp).toContain("default-src 'self'");
     expect(csp).toContain("script-src 'self'");
-    expect(csp).toContain("connect-src https://ulnxanoxrkfhohxiwuxn.supabase.co");
+    expect(csp).toContain("connect-src https://switchboard.russellzager.com");
     expect(csp).not.toContain("unsafe-inline");
     expect(html).not.toMatch(/<script(?![^>]*\bsrc=)[^>]*>/); // no inline scripts
   });
@@ -36,13 +36,13 @@ describe("published page", () => {
 
   test("bus override is limited to localhost", () => {
     const cfg = read("config.js");
-    expect(cfg).toContain("https://ulnxanoxrkfhohxiwuxn.supabase.co/functions/v1/switchboard");
+    expect(cfg).toContain("https://switchboard.russellzager.com/functions/v1/switchboard");
     expect(cfg).toMatch(/localhost/);
   });
 
   test("rename v1.13: the page calls /functions/v1/switchboard and shows Switchboard", () => {
     const base = read("config.js").match(/DEFAULT_BUS_BASE\s*=\s*"([^"]+)"/)?.[1] ?? "";
-    expect(base).toBe("https://ulnxanoxrkfhohxiwuxn.supabase.co/functions/v1/switchboard");
+    expect(base).toBe("https://switchboard.russellzager.com/functions/v1/switchboard");
     expect(read("index.html").match(/<title>([^<]*)<\/title>/)?.[1]).toBe("Switchboard");
     expect(read("app.js")).toContain('h("h1", { class: "brand" }, "Switchboard")');
     // Every visible string and CLI hint uses the new name (rpId and CNAME are not text).
